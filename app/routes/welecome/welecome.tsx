@@ -36,7 +36,7 @@ export default function Welcome() {
 
       const data = await response.json();
       localStorage.setItem('token', data["token"]);
-      navigate("/");
+      navigate("/create");
       console.log(data);
     }
 
