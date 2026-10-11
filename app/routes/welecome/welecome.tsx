@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/welecome";
 import { getUserGeolocation } from "~/service/geolocation";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -11,6 +11,7 @@ export function meta({}: Route.MetaArgs) {
 }
 const API_BASE_URL = "https://api.auqamarine.date";
 export default function Welcome() {
+    const  { gameId }  = useParams();
     const [geolocation, setGeolocation] = useState<number[] | undefined>();
     const [name, setName] = useState<string>("");
     const navigate = useNavigate();
@@ -43,8 +44,13 @@ export default function Welcome() {
   return (
     <>
       <div className="flex flex-col justify-center items-center gap-2">
-        <h1>這裡是歡迎頁面</h1>
-        <span>
+        <h1>這裡是歡迎頁面，恭喜你加入測試。</h1>
+          <h1>
+              {gameId
+                  ? `你是透過亂掃路邊 QRCODE 過來的吧！ 歡迎！`
+                  : "歡迎！"}
+          </h1>
+          <span>
           {geolocation
             ? `你的位置在 ${geolocation[0]}, ${geolocation[1]}`
             : "正在取得位置..."}
