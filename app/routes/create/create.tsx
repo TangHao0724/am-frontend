@@ -69,7 +69,7 @@ export default function Create() {
         console.log(JSON.stringify(payload, null, 2));
         const token = localStorage.getItem('token');
         // 替換成你實際的後端 API 路徑
-        const response = await fetch("http://54.54.68.45:8080/api/create", {
+        const response = await fetch("https://api.auqamarine.date/api/create", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

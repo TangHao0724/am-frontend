@@ -9,7 +9,7 @@ export function meta({}: Route.MetaArgs) {
     { name: "description", content: "Welcome to React Router!" },
   ];
 }
-const API_BASE_URL = "http://54.54.68.45:8080";
+const API_BASE_URL = "https://api.auqamarine.date";
 export default function Welcome() {
     const [geolocation, setGeolocation] = useState<number[] | undefined>();
     const [name, setName] = useState<string>("");

@@ -12,7 +12,7 @@ type QRCodeDialogProps = {
     onClose: () => void;
 };
 
-const API_BASE_URL = "http://54.54.68.45:8080";
+const API_BASE_URL = "https://api.auqamarine.date";
 
 export default function QRCodeDialog({
     open,

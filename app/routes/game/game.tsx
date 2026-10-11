@@ -42,7 +42,7 @@ export default function GameQRCodes() {
                 // 從後端回傳的 start_stage_id 開始
                 for (let stageId = firstId; ; stageId++) {
                     const response = await fetch(
-                        `http://54.54.68.45:8080/api/qrcode/${encodeURIComponent(gameId!)}/${encodeURIComponent(stageId!)}`,{
+                        `https://api.auqamarine.date/api/qrcode/${encodeURIComponent(gameId!)}/${encodeURIComponent(stageId!)}`,{
                           headers: {
                               "Content-Type": "application/json",
                               "Authorization": `Bearer ${token}`

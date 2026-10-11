@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { Html5Qrcode } from "html5-qrcode";
 
-const API_BASE_URL = "http://54.54.68.45:8080/api";
+const API_BASE_URL = "https://api.auqamarine.date/";
 
 export function getUserGeolocation(): Promise<number[]> {
     return new Promise((resolve, reject) => {
