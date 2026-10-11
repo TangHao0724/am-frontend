@@ -2,8 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { Html5Qrcode } from "html5-qrcode";
 
-const API_BASE_URL = "https://api.auqamarine.date/";
+type ScanRequestBody = {
+    lat: number;
+    lon: number;
+};
 
+const API_HOST = "api.auqamarine.com";
+
+// 取得使用者目前的 GPS 座標，回傳 [緯度, 經度]
 export function getUserGeolocation(): Promise<number[]> {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -12,13 +18,23 @@ export function getUserGeolocation(): Promise<number[]> {
         }
 
         navigator.geolocation.getCurrentPosition(
-            (point) => {
+            (position) => {
                 resolve([
-                    point.coords.latitude,
-                    point.coords.longitude,
+                    position.coords.latitude,
+                    position.coords.longitude,
                 ]);
             },
-            (error) => reject(error),
+            (error) => {
+                reject(
+                    new Error(
+                        error.code === error.PERMISSION_DENIED
+                            ? "使用者拒絕定位權限"
+                            : error.code === error.TIMEOUT
+                              ? "取得定位逾時，請再試一次"
+                              : "無法取得目前位置"
+                    )
+                );
+            },
             {
                 enableHighAccuracy: true,
                 timeout: 10000,
@@ -28,37 +44,41 @@ export function getUserGeolocation(): Promise<number[]> {
     });
 }
 
-// QR Code 可以直接放 stage_id，或放包含 stage_id 的網址
-function parseStageId(value: string): string {
-    const text = value.trim();
+// 驗證 QR Code 是否為預期的 API 網址
+function parseQRCodeUrl(value: string): string {
+    let url: URL;
 
-    // QR Code 內容直接是數字 ID
-    if (/^\d+$/.test(text)) {
-        return text;
-    }
-
-    // QR Code 內容是網址
     try {
-        const url = new URL(text);
-
-        const queryStageId = url.searchParams.get("stage_id");
-        if (queryStageId && /^\d+$/.test(queryStageId)) {
-            return queryStageId;
-        }
-
-        // 支援 /stages/:game_id/:stage_id
-        const match = url.pathname.match(/\/stages\/\d+\/(\d+)\/?$/);
-
-        if (match) {
-            return match[1];
-        }
+        url = new URL(value.trim());
     } catch {
-        // 不是合法網址
+        throw new Error("QR Code 內容不是有效的網址");
     }
 
-    throw new Error(
-        "無法從 QR Code 取得 stage_id。請確認 QR Code 內容是階段 ID 或包含 stage_id 的網址。"
+    // 避免將 Bearer Token 傳送到不可信任的網址
+    if (
+        url.protocol !== "https:" ||
+        url.hostname !== API_HOST ||
+        url.port !== "" ||
+        url.username !== "" ||
+        url.password !== ""
+    ) {
+        throw new Error("QR Code 網址不符合預期的 API 網域");
+    }
+
+    // 預期格式：/qrcode/:game_id/:qrcode_uid
+    const match = url.pathname.match(
+        /^\/qrcode\/(\d+)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i
     );
+
+    if (!match) {
+        throw new Error("QR Code 網址格式錯誤");
+    }
+
+    if (url.search || url.hash) {
+        throw new Error("QR Code 網址不應包含額外參數");
+    }
+
+    return url.toString();
 }
 
 export default function ScanPage() {
@@ -87,7 +107,7 @@ export default function ScanPage() {
     }
 
     async function handleScan(decodedText: string) {
-        // 防止同一個 QR Code 被連續辨識而重複送出請求
+        // 防止掃描器連續辨識同一張 QR Code
         if (processingRef.current) return;
 
         processingRef.current = true;
@@ -97,36 +117,45 @@ export default function ScanPage() {
         await stopScanner();
 
         try {
-            if (!gameId) {
-                throw new Error("網址缺少 gameId");
+            // 1. 取得並驗證 QR Code 中的完整 API 網址
+            const targetUrl = parseQRCodeUrl(decodedText);
+
+            // 如果頁面帶有 gameId，確認與 QR Code 的遊戲 ID 一致
+            const qrGameId = new URL(targetUrl).pathname.split("/")[2];
+
+            if (gameId && qrGameId !== gameId) {
+                throw new Error("此 QR Code 不屬於目前的遊戲");
             }
 
+            // 2. 取得登入 Token
             const token = localStorage.getItem("token");
 
             if (!token) {
                 throw new Error("找不到登入 Token，請先登入");
             }
 
-            const stageId = parseStageId(decodedText);
+            // 3. 取得 GPS 座標
             const [lat, lon] = await getUserGeolocation();
 
-            setMessage("定位成功，正在提交資料...");
+            const body: ScanRequestBody = {
+                lat,
+                lon,
+            };
 
-            const params = new URLSearchParams({
-                lat: String(lat),
-                lon: String(lon),
+            setMessage("定位成功，正在提交掃描資料...");
+
+            // 4. 對 QR Code 中的網址發送 POST
+            const response = await fetch(targetUrl, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: JSON.stringify(body),
             });
 
-            const response = await fetch(
-                `${API_BASE_URL}/stages/${encodeURIComponent(gameId)}/${encodeURIComponent(stageId)}?${params.toString()}`,
-                {
-                    method: "GET",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
+            // 5. 解析後端回應
             const contentType =
                 response.headers.get("content-type") ?? "";
 
@@ -135,15 +164,17 @@ export default function ScanPage() {
                 : await response.text();
 
             if (!response.ok) {
-                throw new Error(
+                const errorMessage =
                     typeof result === "string"
                         ? result || `請求失敗：${response.status}`
                         : result.message ||
                           result.error ||
-                          `請求失敗：${response.status}`
-                );
+                          `請求失敗：${response.status}`;
+
+                throw new Error(errorMessage);
             }
 
+            // 6. 顯示成功訊息
             setMessage(
                 typeof result === "string"
                     ? `掃描完成：${result}`
@@ -162,7 +193,7 @@ export default function ScanPage() {
     }
 
     async function startScanner() {
-        if (scanning || loading) return;
+        if (scanning || loading || scannerRef.current) return;
 
         try {
             setMessage("");
@@ -180,7 +211,7 @@ export default function ScanPage() {
                     void handleScan(decodedText);
                 },
                 () => {
-                    // 尚未辨識到 QR Code 時，不必顯示錯誤
+                    // 尚未辨識到 QR Code，不需要顯示錯誤
                 }
             );
 
@@ -189,6 +220,7 @@ export default function ScanPage() {
         } catch (error) {
             scannerRef.current = null;
             setScanning(false);
+
             setMessage(
                 error instanceof Error
                     ? `無法啟動相機：${error.message}`
@@ -213,7 +245,9 @@ export default function ScanPage() {
                 掃描階段 QR Code
             </h1>
 
-            <p className="mb-4">遊戲 ID：{gameId ?? "未提供"}</p>
+            <p className="mb-4">
+                遊戲 ID：{gameId ?? "未提供"}
+            </p>
 
             <div
                 id="qr-reader"
@@ -223,7 +257,7 @@ export default function ScanPage() {
             <div className="flex gap-3">
                 <button
                     type="button"
-                    onClick={startScanner}
+                    onClick={() => void startScanner()}
                     disabled={scanning || loading}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
                 >
