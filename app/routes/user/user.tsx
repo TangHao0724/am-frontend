@@ -7,7 +7,7 @@ type ScanRequestBody = {
     lon: number;
 };
 
-const API_HOST = "api.auqamarine.com";
+const API_HOST = "api.auqamarine.date";
 
 // 取得使用者目前的 GPS 座標，回傳 [緯度, 經度]
 export function getUserGeolocation(): Promise<number[]> {
