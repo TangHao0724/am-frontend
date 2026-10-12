@@ -121,7 +121,7 @@ export default function ScanPage() {
             const targetUrl = parseQRCodeUrl(decodedText);
 
             // 如果頁面帶有 gameId，確認與 QR Code 的遊戲 ID 一致
-            const qrGameId = new URL(targetUrl).pathname.split("/")[2];
+            const qrGameId = new URL(decodedText).pathname.split("/")[2];
 
             if (gameId && qrGameId !== gameId) {
                 throw new Error("此 QR Code 不屬於目前的遊戲");
