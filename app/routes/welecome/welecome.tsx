@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/welecome";
 import { getUserGeolocation } from "~/service/geolocation";
 import { useNavigate, useParams } from "react-router";
+import AnonymousRegister from "./component/anonymousRegister";
+import Register from "./component/register";
+import Login from "./component/login";
+import UpdateUser from "./component/updateUser";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,11 +13,10 @@ export function meta({}: Route.MetaArgs) {
     { name: "description", content: "Welcome to React Router!" },
   ];
 }
-const API_BASE_URL = "https://api.auqamarine.date";
+
 export default function Welcome() {
     const  { gameId }  = useParams();
     const [geolocation, setGeolocation] = useState<number[] | undefined>();
-    const [name, setName] = useState<string>("");
     const navigate = useNavigate();
     useEffect(() => {   
         getUserGeolocation()
@@ -24,23 +27,17 @@ export default function Welcome() {
                 console.error("取得位置失敗", error);
             });
     }, []);
-    async function sub_user(){
-      const response = await fetch(`${API_BASE_URL}/user`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: name,
-        }),
-      });
+    
+  function handleRegisterDone(isDone: boolean) {
+     if (!isDone) return;
 
-      const data = await response.json();
-      localStorage.setItem('token', data["token"]);
-      navigate("/create");
-      console.log(data);
+    if (gameId) {
+      navigate(`/game/${gameId}`);
+      return;
     }
 
+    console.log("OK");
+  }
   return (
     <>
       <div className="flex flex-col justify-center items-center gap-2">
@@ -55,13 +52,10 @@ export default function Welcome() {
             ? `你的位置在 ${geolocation[0]}, ${geolocation[1]}`
             : "正在取得位置..."}
         </span>
-        <div className="flex flex-row gap-1.5 items-center">
-            <label htmlFor="">暱稱：</label>
-            <input type="text" onChange={(event) => setName(event.target.value)} className="border border-main-3 text-md p-2 rounded-md"/>
-        </div>
-        <div>
-            <button className="bg-main-2 rounded-md border px-3 py-1" onClick={sub_user}>送出</button>
-        </div>
+        <AnonymousRegister isDone={handleRegisterDone} />
+        <Register isDone={handleRegisterDone} />
+        <Login isDone={handleRegisterDone} />
+        <UpdateUser isDone={handleRegisterDone}/>
       </div>
     </>
   );
